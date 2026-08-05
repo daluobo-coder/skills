@@ -44,12 +44,12 @@
   "dynasty": "唐",
   "total_episodes": 5,
   "bgm_path": "$HOME/workspace/data/ai_drama/bgm/gaoshan_liushui_guzheng.mp3",
-  "channel_name": "平章说",
-  "opening_hook_template": "平章说,{本集核心反转/焦点}",
-  "ending_slogan": "读史明事理,平章说",
+  "channel_name": "",
+  "opening_hook_template": "{本集核心反转/焦点}",
+  "ending_slogan": "读史明事理",
   "episodes": [
-    {"ep": 1, "title": "刀下留人", "hook": "平章说,她爷爷被武则天杀了,她却成了武则天最信任的人"},
-    {"ep": 2, "title": "额上梅花", "hook": "平章说,她脸上的梅花,不是画的,是刀刻的"}
+    {"ep": 1, "title": "刀下留人", "hook": "她爷爷被武则天杀了,她却成了武则天最信任的人"},
+    {"ep": 2, "title": "额上梅花", "hook": "她脸上的梅花,不是画的,是刀刻的"}
   ],
   "created_at": "2026-07-21T20:35:00+08:00"
 }

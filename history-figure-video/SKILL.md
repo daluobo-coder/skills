@@ -1,6 +1,6 @@
 ---
 name: history-figure-video
-description: 历史人物抖音短视频生成。史料→旁白→AI生图→百炼TTS配音→字幕→合成竖屏视频。当用户提到"历史人物视频""人物传记视频""做个历史视频""历史短视频""历史人物故事视频""帮我讲讲XX的故事并做成视频""XX的视频怎么做"时使用此skill。即使用户只给出人物名并要求生成视频,也应触发。适用于抖音历史赛道"平章说"频道的序列篇短视频制作。
+description: 历史人物抖音短视频/中视频生成。史料→旁白→AI生图→百炼TTS配音→字幕→合成竖屏视频。当用户提到"历史人物视频""人物传记视频""做个历史视频""历史短视频""历史人物故事视频""帮我讲讲XX的故事并做成视频""XX的视频怎么做"时使用此skill。即使用户只给出人物名并要求生成视频,也应触发。适用于抖音历史赛道序列篇/单集中视频制作。
 ---
 
 # 历史人物短视频生成
@@ -10,6 +10,7 @@ description: 历史人物抖音短视频生成。史料→旁白→AI生图→�
 1. **分步执行,每步汇报** — 每完成一步必须向用户汇报进度
 2. **CPU精准管控** — 只在视频合成(步骤7)时切换CPU 100%+开睿频,完成后立即切回40%+关睿频
 3. **图片逐张质检** — 步骤4b逐张审查,每张汇报结果
+4. **无固定频道品牌** — 开篇钩子直接抛核心矛盾/反转，不绑定任何频道名；结尾slogan固定为"读史明事理"
 
 ## 执行方式
 
@@ -97,7 +98,31 @@ python3 ~/.openclaw/skills/history-figure-video/scripts/generate_images.py <epis
 
 ## 4b 逐张图片质检
 
-逐张审查,每张汇报。FAIL处理同folk-story-video。
+逐张审查,每张汇报。
+
+**审查标准**:构图合理、画面完整、无文字渲染、风格统一、人物剪影/侧脸。
+
+### 审查流程
+
+1. 按序审查 `images/ai_{NN}.png`
+2. **PASS** → 记录通过,继续下一张
+3. **FAIL** → 执行重试流程
+
+### 重试流程(每张图最多3轮)
+
+a. 记录失败图片路径+失败原因+当前重试次数到 `progress.json.image_retries`
+b. **回到步骤4**,重新执行 `generate_images.py <episode_dir>`(脚本幂等,重新生成全部图片)
+c. **回到4b**,单独审查该张图片
+d. 通过则继续;FAIL则重复a-c,满3次进入e
+e. **3次均失败** → 加入 `progress.json.skipped_images` 列表,跳过该图,继续下一张
+
+### 后续步骤对缺失图片的处理
+
+- **步骤5 screenshot.py**:读取 `skipped_images`,对缺失图片用纯色背景+章节标题占位HTML
+- **步骤7 compose_video.py**:对 `skipped_images` 中的图片用渐变/纯色兜底帧,最终汇报时列出"N张图片使用了兜底方案"
+- **final 汇报**:读取 `progress.json.skipped_images`,告知用户哪些图片未能生成,建议手动补图后重新合成
+
+全部完成后:更新 `progress.json`(current_step=4b),汇报用户进度。
 
 ## 5 HTML截图(后台,30-60s)
 
@@ -182,7 +207,7 @@ cd $HOME/workspace/social-auto-upload && xvfb-run python sau_cli.py douyin uploa
 - `--tags`: publish.txt第三行的话题,逗号分隔(去掉#号)
 - `--declaration`: 固定为 `"内容由AI生成"`
 
-**话题规则**:必带 `#平章说` `#{人物名}` `#{朝代}` `#人文历史`,再按内容选带1-2个话题,详见 `references/style-guide.md`。
+**话题规则**:必带 `#{人物名}` `#{朝代}` `#人文历史`,再按内容选带1-2个话题,详见 `references/style-guide.md`。
 
 ### 8.3 ⚠️ 时间陷阱：时区转换
 

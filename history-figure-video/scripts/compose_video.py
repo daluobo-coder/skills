@@ -258,7 +258,7 @@ if not os.path.exists(publish_path):
     # 简介从opening_hook和ending_hook提取
     opening_hook = script.get("opening_hook", "")
     ending_hook = script.get("ending_hook", "")
-    # 用opening_hook作为简介基础（去掉"平章说,"前缀）
+    # 用opening_hook作为简介基础（兼容旧数据,去掉频道名前缀）
     desc = opening_hook
     if desc.startswith("平章说,") or desc.startswith("平章说，"):
         desc = desc.split("，", 1)[-1] if "，" in desc else desc.split(",", 1)[-1]
@@ -267,7 +267,7 @@ if not os.path.exists(publish_path):
 
     # 话题标签
     dynasty = script.get("dynasty", "")
-    tags = ["平章说", figure_name]
+    tags = [figure_name]
     if dynasty:
         tags.append(dynasty)
     # 从sections内容推断额外标签

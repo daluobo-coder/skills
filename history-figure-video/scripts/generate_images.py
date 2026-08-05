@@ -8,6 +8,7 @@ AI生图脚本 - 百度 ERNIE-Image-Turbo
 """
 import json, os, sys, time, requests, fcntl
 from io import BytesIO
+from email.utils import formatdate
 from PIL import Image, ImageDraw
 
 # === 硬性防护：禁止DashScope文生图 ===
@@ -49,6 +50,7 @@ def generate_with_baidu(prompt, negative_prompt=""):
     headers = {
         "Authorization": f"Bearer {BAIDU_API_KEY}",
         "Content-Type": "application/json",
+        "date": formatdate(timeval=time.time(), localtime=False, usegmt=True),
         "X-Client-Platform": "aistudio",
     }
     payload = {

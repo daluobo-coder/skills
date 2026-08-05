@@ -10,8 +10,11 @@
 被 tts_subtitle.py 和 compose_video.py 共同引用
 """
 
-import os, re, json, time, subprocess, sys
+import os, re, json, time, subprocess, sys, glob
 import requests
+
+TTS_MODEL = "qwen3-tts-flash"
+VOICE_FINGERPRINT = "voice_fingerprint.json"  # 记录缓存所属音色, 换音色时自动失效
 
 # === 工具函数 ===
 
@@ -57,6 +60,46 @@ def gen_silence(duration, path):
         "-i", f"anullsrc=r=24000:cl=mono",
         "-t", str(duration), "-c:a", "pcm_s16le", path
     ], capture_output=True)
+
+
+def check_voice_cache(audio_dir, voice):
+    """
+    音色指纹检查: 确保缓存音频属于当前音色
+
+    - audio_dir/voice_fingerprint.json 记录上次生成音频的音色+模型
+    - 与当前 voice 一致 → 返回 True, 正常复用缓存
+    - 不一致/缺失 → 清理旧 seg/silence/merged/concat 缓存, 写入新指纹, 返回 False
+    """
+    fp_path = os.path.join(audio_dir, VOICE_FINGERPRINT)
+    current = {"voice": voice, "model": TTS_MODEL}
+
+    cached = None
+    if os.path.exists(fp_path):
+        try:
+            with open(fp_path) as f:
+                cached = json.load(f)
+        except Exception:
+            cached = None
+
+    if cached == current:
+        return True  # 音色一致, 缓存可复用
+
+    # 音色不一致或指纹缺失: 清理旧缓存, 避免旧音色文件被误用
+    removed = 0
+    for pattern in ["seg_*_s*.wav", "silence_*.wav", "seg_*_merged.wav", "concat_*.txt"]:
+        for p in glob.glob(os.path.join(audio_dir, pattern)):
+            try:
+                os.remove(p)
+                removed += 1
+            except OSError:
+                pass
+
+    with open(fp_path, "w") as f:
+        json.dump(current, f, ensure_ascii=False, indent=2)
+
+    old_voice = cached.get("voice") if cached else "无"
+    print(f"  🔄 音色指纹变更 ({old_voice} → {voice}), 清理 {removed} 个旧音频缓存")
+    return False
 
 
 def qwen_tts(text, output_path, voice="Vincent", api_key=None, max_retries=3):
@@ -136,6 +179,9 @@ def run_tts_pipeline(script, audio_dir, sub_dir, voice="Vincent", api_key=None,
     """
     os.makedirs(audio_dir, exist_ok=True)
     os.makedirs(sub_dir, exist_ok=True)
+
+    # 音色指纹检查: 换音色自动清理旧缓存, 同音色复用缓存
+    check_voice_cache(audio_dir, voice)
 
     sections = script["sections"]
 

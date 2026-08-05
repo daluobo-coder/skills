@@ -76,7 +76,7 @@ def find_bg_image(idx):
 
 
 def generate_cover_html(figure_name, dynasty, bg_path=None):
-    """封面页: 垂直居中三行 — 系列名/人物名/朝代"""
+    """封面页: 单行显示片名，简洁大气"""
     bg_style = ""
     if bg_path:
         bg_uri = img_to_base64(bg_path)
@@ -89,15 +89,11 @@ def generate_cover_html(figure_name, dynasty, bg_path=None):
 body {{ width:768px; height:1376px; background:{MAIN_BG}; {bg_style} display:flex; flex-direction:column; justify-content:center; align-items:center; font-family:'Noto Sans CJK SC',sans-serif; }}
 .overlay {{ position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.55); }}
 .content {{ position:relative; z-index:1; text-align:center; }}
-.series {{ color:{DARK_RED}; font-size:52px; font-weight:bold; text-shadow:2px 2px 6px rgba(0,0,0,0.9); margin-bottom:30px; }}
-.name {{ color:{GOLD}; font-size:88px; font-weight:bold; text-shadow:2px 2px 8px rgba(0,0,0,0.9); margin-bottom:20px; }}
-.dynasty {{ color:{WHITE}; font-size:36px; text-shadow:1px 1px 4px rgba(0,0,0,0.8); }}
+.title {{ color:{GOLD}; font-size:92px; font-weight:bold; text-shadow:3px 3px 10px rgba(0,0,0,0.9); letter-spacing:8px; }}
 </style></head><body>
 <div class="overlay"></div>
 <div class="content">
-  <div class="series">历史人物</div>
-  <div class="name">{figure_name}</div>
-  <div class="dynasty">{dynasty}</div>
+  <div class="title">{figure_name}</div>
 </div>
 </body></html>"""
 
@@ -145,7 +141,7 @@ body {{ width:768px; height:1376px; background:{MAIN_BG}; {bg_style} display:fle
 </body></html>"""
 
 
-def generate_ending_html(slogan="读史明事理，平章说", bg_path=None):
+def generate_ending_html(slogan="读史明事理", bg_path=None):
     """结尾页: 居中金句"""
     bg_style = ""
     if bg_path:
