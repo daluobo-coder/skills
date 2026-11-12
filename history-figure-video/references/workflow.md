@@ -297,16 +297,19 @@ python3 ~/.openclaw/skills/history-figure-video/scripts/screenshot.py <episode_d
 
 ## 6 TTS+字幕(后台,2-5min)
 
-### TTS引擎:百炼 qwen3-tts-flash
+### TTS引擎:edge-tts(默认,免费)
 
-- 音色: Vincent(百炼内置,无需参考音频)
-- 句间停顿: 句号0.5s, 逗号0.2s, 分号0.4s
-- 长文本: 按section逐段合成,避免超时
-- 合成后统一ffmpeg拼接
+- 默认音色: `zh-CN-YunjianNeural`(男声·沉稳叙事),备选见 `--list-voices`
+- 语速: 默认 `+8%`(历史解说偏快一点),用 `--rate` 调整
+- 依赖: `edge-tts>=7.3.1`(旧版会被微软接口 403 拒绝,必须升级)
+- 逐句合成后统一转 24k 单声道 wav,再 ffmpeg 拼接
+- 切换音色/引擎会自动清理旧音频缓存(voice_fingerprint.json)
+
+**备选引擎(需 TTS_API_KEY)**:`--engine qwen`,百炼 qwen3-tts-flash,音色 Vincent。
 
 ### 字幕生成
 
-百炼TTS返回音频无时间轴,从实际音频时长反推SRT。每段字幕按标点符号分行显示。**停顿期间字幕保持显示(每句end延伸到下一句start),避免字幕闪烁**。
+按标点分行,从实际音频时长反推SRT(edge 与 qwen 一致)。每段字幕按标点符号分行显示。**停顿期间字幕保持显示(每句end延伸到下一句start),避免字幕闪烁**。
 
 ### 执行脚本
 

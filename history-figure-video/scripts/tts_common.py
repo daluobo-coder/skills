@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-百炼TTS公共模块
-- 百炼 qwen3-tts-flash, 音色 Vincent
+TTS公共模块
+- 默认引擎 edge-tts (Microsoft Edge 在线语音, 免费), 音色 zh-CN-YunjianNeural
+- 备选引擎 qwen (百炼 qwen3-tts-flash, 音色 Vincent, 需 TTS_API_KEY)
 - 按标点拆分单句, 逐句合成
 - 句间停顿(句号0.5s, 逗号0.2s, 分号0.4s)
 - 从实际音频时长反推字幕时间轴
@@ -10,10 +11,19 @@
 被 tts_subtitle.py 和 compose_video.py 共同引用
 """
 
-import os, re, json, time, subprocess, sys, glob
+import os, re, json, time, subprocess, sys, glob, asyncio
 import requests
 
 TTS_MODEL = "qwen3-tts-flash"
+EDGE_DEFAULT_VOICE = "zh-CN-YunjianNeural"
+EDGE_VOICES = {
+    "zh-CN-YunjianNeural": "男声·沉稳叙事(默认,适合历史解说)",
+    "zh-CN-YunyangNeural": "男声·新闻播报",
+    "zh-CN-YunxiNeural": "男声·年轻清亮",
+    "zh-CN-YunxiaNeural": "男声·少年",
+    "zh-CN-XiaoxiaoNeural": "女声·温和",
+    "zh-CN-XiaoyiNeural": "女声·活泼",
+}
 VOICE_FINGERPRINT = "voice_fingerprint.json"  # 记录缓存所属音色, 换音色时自动失效
 
 # === 工具函数 ===
@@ -62,7 +72,7 @@ def gen_silence(duration, path):
     ], capture_output=True)
 
 
-def check_voice_cache(audio_dir, voice):
+def check_voice_cache(audio_dir, voice, engine="qwen"):
     """
     音色指纹检查: 确保缓存音频属于当前音色
 
@@ -71,7 +81,7 @@ def check_voice_cache(audio_dir, voice):
     - 不一致/缺失 → 清理旧 seg/silence/merged/concat 缓存, 写入新指纹, 返回 False
     """
     fp_path = os.path.join(audio_dir, VOICE_FINGERPRINT)
-    current = {"voice": voice, "model": TTS_MODEL}
+    current = {"engine": engine, "voice": voice, "model": TTS_MODEL if engine == "qwen" else "edge-tts"}
 
     cached = None
     if os.path.exists(fp_path):
@@ -98,7 +108,7 @@ def check_voice_cache(audio_dir, voice):
         json.dump(current, f, ensure_ascii=False, indent=2)
 
     old_voice = cached.get("voice") if cached else "无"
-    print(f"  🔄 音色指纹变更 ({old_voice} → {voice}), 清理 {removed} 个旧音频缓存")
+    print(f"  🔄 音色/引擎指纹变更 ({old_voice} → {voice}), 清理 {removed} 个旧音频缓存")
     return False
 
 
@@ -150,6 +160,45 @@ def qwen_tts(text, output_path, voice="Vincent", api_key=None, max_retries=3):
     return False
 
 
+def edge_tts_synth(text, output_path, voice=EDGE_DEFAULT_VOICE, rate="+0%", max_retries=3):
+    """Edge-TTS 在线合成(免费), 失败自动重试; 输出统一转 24k 单声道 wav"""
+    try:
+        import edge_tts
+    except ImportError:
+        print("  ❌ 未安装 edge-tts, 请执行: pip install edge-tts")
+        return False
+
+    mp3_path = output_path + ".mp3"
+    for attempt in range(max_retries):
+        try:
+            async def _run():
+                comm = edge_tts.Communicate(text, voice, rate=rate)
+                await comm.save(mp3_path)
+            asyncio.run(_run())
+
+            if os.path.exists(mp3_path) and os.path.getsize(mp3_path) > 1000:
+                r = subprocess.run([
+                    "ffmpeg", "-y", "-i", mp3_path,
+                    "-ar", "24000", "-ac", "1", "-c:a", "pcm_s16le", output_path
+                ], capture_output=True, text=True)
+                try:
+                    os.remove(mp3_path)
+                except OSError:
+                    pass
+                if os.path.exists(output_path) and os.path.getsize(output_path) > 4000:
+                    return True
+                print(f"  EdgeTTS转码失败(尝试{attempt+1}/{max_retries}): {(r.stderr or '')[-160:]}")
+            else:
+                print(f"  EdgeTTS无输出(尝试{attempt+1}/{max_retries})")
+        except Exception as e:
+            print(f"  EdgeTTS异常(尝试{attempt+1}/{max_retries}): {e}")
+
+        if attempt < max_retries - 1:
+            time.sleep(1.2)
+
+    return False
+
+
 def format_srt_time(seconds):
     """标准SRT时间格式 HH:MM:SS,mmm"""
     h = int(seconds // 3600)
@@ -159,8 +208,9 @@ def format_srt_time(seconds):
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
-def run_tts_pipeline(script, audio_dir, sub_dir, voice="Vincent", api_key=None,
-                     pause_period=0.5, pause_comma=0.2, pause_semicolon=0.4):
+def run_tts_pipeline(script, audio_dir, sub_dir, voice=None, api_key=None,
+                     pause_period=0.5, pause_comma=0.2, pause_semicolon=0.4,
+                     engine="edge", rate="+0%"):
     """
     完整TTS流水线: 逐句合成 → 带停顿拼接 → 生成SRT
 
@@ -168,8 +218,10 @@ def run_tts_pipeline(script, audio_dir, sub_dir, voice="Vincent", api_key=None,
         script: script.json 内容(dict, 含 sections)
         audio_dir: 音频输出目录
         sub_dir: 字幕输出目录
-        voice: 百炼TTS音色
-        api_key: DashScope API Key
+        voice: 音色(edge: zh-CN-*; qwen: Vincent 等)
+        api_key: DashScope API Key(仅 qwen 引擎需要)
+        engine: edge | qwen
+        rate: edge 引擎语速, 如 "+8%"/"-5%"。历史解说建议 +5%~+10%
         pause_period/comma/semicolon: 句间停顿时长
 
     返回:
@@ -180,8 +232,14 @@ def run_tts_pipeline(script, audio_dir, sub_dir, voice="Vincent", api_key=None,
     os.makedirs(audio_dir, exist_ok=True)
     os.makedirs(sub_dir, exist_ok=True)
 
-    # 音色指纹检查: 换音色自动清理旧缓存, 同音色复用缓存
-    check_voice_cache(audio_dir, voice)
+    if engine not in ("edge", "qwen"):
+        raise ValueError(f"未知 TTS 引擎: {engine}")
+    if not voice:
+        voice = EDGE_DEFAULT_VOICE if engine == "edge" else "Vincent"
+
+    # 音色/引擎指纹检查: 变更时自动清理旧缓存, 一致则复用缓存
+    check_voice_cache(audio_dir, voice, engine)
+    print(f"TTS引擎: {engine} / 音色: {voice}" + (f" / 语速: {rate}" if engine == "edge" else ""))
 
     sections = script["sections"]
 
@@ -207,7 +265,10 @@ def run_tts_pipeline(script, audio_dir, sub_dir, voice="Vincent", api_key=None,
                 continue
 
             print(f"  TTS {audio_name}: {sent[:30]}...")
-            ok = qwen_tts(sent, audio_path, voice=voice, api_key=api_key)
+            if engine == "edge":
+                ok = edge_tts_synth(sent, audio_path, voice=voice, rate=rate)
+            else:
+                ok = qwen_tts(sent, audio_path, voice=voice, api_key=api_key)
             if ok:
                 dur = get_duration(audio_path)
                 print(f"    OK: {dur:.2f}s")

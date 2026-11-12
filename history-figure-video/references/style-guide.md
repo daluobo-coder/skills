@@ -141,6 +141,8 @@
 
 ## 配音
 
-- 百炼 qwen3-tts-flash,音色 Vincent
+- edge-tts,默认音色 `zh-CN-YunjianNeural`(男声·沉稳叙事),语速 `+8%`
+- 备选: `zh-CN-YunyangNeural`(播报)/`zh-CN-YunxiNeural`(年轻)/`zh-CN-XiaoxiaoNeural`(女声)
 - 句间停顿:句号0.5s,逗号0.2s,分号0.4s
 - 文案中用逗号和省略号控制节奏
+- 需要更强表现力时改用 `--engine qwen`(百炼 Vincent)

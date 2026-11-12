@@ -32,6 +32,7 @@ sessions_spawn(
 ## 前置依赖
 
 - Python 3.12+、ffmpeg+ffprobe、playwright、Pillow、python-dotenv、pypinyin、requests
+- **edge-tts ≥7.3.1**(步骤6默认TTS,免费,需能访问微软语音接口)
 - 百度AI Studio API Key(`BAIDU_API_KEY`,配置在 `$HOME/.openclaw/.env`)
 - TTS API Key(`TTS_API_KEY`,配置在 `$HOME/.openclaw/.env`) — **仅用于TTS(qwen3-tts-flash)，严禁用于文生图**
 - Noto Sans CJK SC 字体(系统已装)
@@ -213,7 +214,12 @@ python3 ~/.openclaw/skills/history-figure-video/scripts/screenshot.py <episode_d
 
 ## 6 TTS+字幕(后台,2-5min)
 
-百炼 qwen3-tts-flash,音色Vincent。句间停顿:句号0.5s/逗号0.2s/分号0.4s。字幕14px加粗,按标点分行显示。**停顿期间字幕保持显示(延伸到下一句开始),避免闪烁**。
+默认 **edge-tts(免费)**,音色 `zh-CN-YunjianNeural`(沉稳男声),语速 `+8%`。句间停顿:句号0.5s/逗号0.2s/分号0.4s。字幕14px加粗,按标点分行显示。**停顿期间字幕保持显示(延伸到下一句开始),避免闪烁**。
+
+- **⚠️ edge-tts 必须 ≥7.3.1**:旧版会被微软接口直接 403(已在本机升级到 7.3.1)
+- 换音色:`--voice zh-CN-YunyangNeural` 等,`--list-voices` 查看全部
+- 换语速:`--rate +12%` / `-5%`
+- 备选付费引擎:`--engine qwen`(百炼 Vincent,需 TTS_API_KEY)
 
 ```bash
 python3 ~/.openclaw/skills/history-figure-video/scripts/tts_subtitle.py <episode_dir>
@@ -375,8 +381,8 @@ xvfb-run python sau_cli.py douyin upload-video ...
 | `references/polyphone-replace.md` | 多音字替换策略+检查脚本 |
 | `references/figure-candidates.md` | 历史人物候选列表 |
 | `scripts/generate_images.py` | AI生图脚本(百度ERNIE-Image-Turbo,读取script.json的bg_prompt) |
-| `scripts/tts_subtitle.py` | 百炼TTS+字幕生成脚本(轻量版,仅TTS+SRT) |
-| `scripts/tts_common.py` | TTS公共模块(被tts_subtitle.py和compose_video.py共用) |
+| `scripts/tts_subtitle.py` | TTS+字幕生成脚本(轻量入口,默认edge-tts,可切qwen) |
+| `scripts/tts_common.py` | TTS公共模块(edge-tts/qwen双引擎,音色指纹缓存) |
 | `scripts/compose_video.py` | 视频合成脚本(读取步骤6音频+SRT,含音效叠加,步骤7一体化) |
 | `scripts/screenshot.py` | HTML截图脚本(封面/故事/结尾页) |
 | `scripts/copy_guard.py` | 文案风控机检(硬拦/归属/软提示/结构,退出码0才放行) |
