@@ -170,7 +170,12 @@ python3 ~/.openclaw/skills/history-figure-video/scripts/generate_images.py <epis
 
 **⚠️ 文生图必须串行调用，禁止并发。每次只调一张图，等上一张完成后再调下一张。多集制作时也必须逐集串行，禁止同时为多集生图。**
 
-脚本读取script.json的bg_prompt，调用百度AI Studio API(ERNIE-Image-Turbo)生成图片，失败时PIL渐变兜底。输出到 `images/ai_{NN}.png`。脚本内部已强制串行（逐张生成，每张间隔1秒）。
+脚本读取script.json的bg_prompt，调用百度AI Studio API(**Stable-Diffusion-XL**)生成图片，中心裁切为 768x1376，失败时PIL渐变兜底。输出 `images/ai_{NN}.png`。脚本内置 8s 节流 + 退避重试，禁止并发。
+
+**⚠️ bg_prompt 必须写英文** — 接口吃中文 prompt 直接 400(实测)。格式:`traditional chinese painting, [scene], muted natural colors, soft diffused light, fine brushwork, vertical composition, no text, no characters`。
+- 尺寸只认 768x1024/1024x768/1024x1024,其它 400
+- `ERNIE-Image-Turbo` 已下线(404),别再改回
+- 补图:`--force` 全部重跑,`--only N` 只重生第 N 张
 
 **⚠️ TTS_API_KEY仅用于TTS(步骤6)，严禁用于文生图。DashScope的wanx-v1、image-synthesis、multimodal-generation等文生图API一律禁止调用。**
 
@@ -380,7 +385,7 @@ xvfb-run python sau_cli.py douyin upload-video ...
 | `references/data-format.md` | 数据路径、目录结构、series_info.json、progress.json格式 |
 | `references/polyphone-replace.md` | 多音字替换策略+检查脚本 |
 | `references/figure-candidates.md` | 历史人物候选列表 |
-| `scripts/generate_images.py` | AI生图脚本(百度ERNIE-Image-Turbo,读取script.json的bg_prompt) |
+| `scripts/generate_images.py` | AI生图脚本(百度Stable-Diffusion-XL,英文prompt,裁切768x1376,含节流重试) |
 | `scripts/tts_subtitle.py` | TTS+字幕生成脚本(轻量入口,默认edge-tts,可切qwen) |
 | `scripts/tts_common.py` | TTS公共模块(edge-tts/qwen双引擎,音色指纹缓存) |
 | `scripts/compose_video.py` | 视频合成脚本(读取步骤6音频+SRT,含音效叠加,步骤7一体化) |

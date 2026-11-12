@@ -64,7 +64,7 @@
 
 - `title` → `script.json.title`
 - `hook` → `opening_hook`，并作为 `sections[1]`（type=hook）的 narration
-- `main_body` 每个自然段 → 一个 section（type=story），配 `source` 与 `bg_prompt`
+- `main_body` 每个自然段 → 一个 section（type=story），配 `source` 与 `bg_prompt`（**bg_prompt 用英文**，模板:`traditional chinese painting, <scene>, muted natural colors, soft diffused light, vertical composition, no text, no characters`）
 - `ending` → 末节（type=ending）的 narration，同时写入 `ending_hook`
 - `note` 的画面关键词 → 各节 `bg_prompt`
 - `sections[0]` 仍是封面（type=cover，narration 留空）

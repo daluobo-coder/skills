@@ -136,7 +136,18 @@
 
 - 开篇用固定钩子(opening_hook)
 - 每集narration总字数600-1200字
-- bg_prompt格式:"中国风历史画,[场景描述],深色调,8K高清,竖构图"
+- bg_prompt格式(**必须英文**):"traditional chinese painting, [scene description], muted natural colors, soft diffused light, fine brushwork, vertical composition, no text, no characters"
+
+**⚠️ bg_prompt 必须是英文** — 百度这个接口吃中文 prompt 会直接返回 `400 Service temporarily unavailable`(已实测,英文则 200)。英文再配下面的铁律使用。
+
+**bg_prompt铁律(踩过坑,必守)**:
+1. **必须是英文** — 中文会 400(接口限制),见上
+2. **末尾必须加 `no text, no characters`** — 画面里任何汉字都会被抖音观众截图吐槽(负面词也传 `negative_prompt`)
+3. **色调 `muted natural colors, soft diffused light`** — 写 dark 会糊成黑,写 bright 会惨白
+4. **只描述场景与器物,不写人物姓名/事件名** — 模型不认识"赵匡胤",写"a middle-aged man sitting alone in a hall"更准;朝代名也别直接写,用器物场景(宋→`red walls, grey tiled eaves`)
+5. **一图一场景**,不要把多件事塞进同一句,画面会撕裂
+6. 接口只吃 768x1024 / 1024x768 / 1024x1024,脚本会自动中心裁切成 768x1376(9:16)
+7. 真实感优先:`realistic brushwork, cinematic lighting`,别堆 `8K/ultra detailed` 这种无效词
 
 ### 3b 避多音字检查
 
@@ -205,7 +216,13 @@ python3 ~/.openclaw/skills/history-figure-video/scripts/generate_images.py <epis
 
 **⚠️ TTS_API_KEY仅用于TTS(步骤6)，严禁用于文生图。DashScope的wanx-v1、image-synthesis、multimodal-generation等文生图API一律禁止调用。**
 
-脚本读取script.json的bg_prompt，调用百度AI Studio API(`BAIDU_API_BASE/images/generations`)生成图片，失败时PIL渐变兜底。输出到 `images/ai_{NN}.png`。已存在的有效图片(>50KB)会自动跳过。脚本内部已强制串行（逐张生成，每张间隔1秒）。
+脚本读取script.json的bg_prompt，调用百度AI Studio API(`BAIDU_API_BASE/images/generations`)生成图片，失败时PIL渐变兜底。输出到 `images/ai_{NN}.png`(768x1376)。已存在的有效图片(>50KB)会自动跳过,`--force` 全部重跑,`--only N` 只重生第N张。
+
+**接口现状(2026-11 实测)**:
+- 模型 `ERNIE-Image-Turbo` 已下线(404),现用 `Stable-Diffusion-XL`(`.env` 的 `TEXT_TO_IMAGE_MODEL`)
+- 中文 prompt → 400,必须英文;尺寸只认 768x1024/1024x768/1024x1024
+- 限流严格:请求间隔需 ≥8s,否则 403 访问过于频繁;脚本已内置 8s 节流 + 退避重试
+- 单张约 8-20s,6张一集约 2 分钟
 
 ### 生图风格
 
