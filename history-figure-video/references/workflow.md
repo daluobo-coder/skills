@@ -218,11 +218,20 @@ python3 ~/.openclaw/skills/history-figure-video/scripts/generate_images.py <epis
 
 脚本读取script.json的bg_prompt，调用百度AI Studio API(`BAIDU_API_BASE/images/generations`)生成图片，失败时PIL渐变兜底。输出到 `images/ai_{NN}.png`(768x1376)。已存在的有效图片(>50KB)会自动跳过,`--force` 全部重跑,`--only N` 只重生第N张。
 
-**接口现状(2026-11 实测)**:
-- 模型 `ERNIE-Image-Turbo` 已下线(404),现用 `Stable-Diffusion-XL`(`.env` 的 `TEXT_TO_IMAGE_MODEL`)
-- 中文 prompt → 400,必须英文;尺寸只认 768x1024/1024x768/1024x1024
-- 限流严格:请求间隔需 ≥8s,否则 403 访问过于频繁;脚本已内置 8s 节流 + 退避重试
-- 单张约 8-20s,6张一集约 2 分钟
+**双引擎(2026-11 实测)**:
+
+| 引擎 | 状态 | 画质 | 说明 |
+|---|---|---|---|
+| `wan` | ⛔ 欠费 | ★★★★ | 阿里百炼 万相2.5,国风/人物最好,中文prompt友好,~¥0.2/张 |
+| `flux` | ✅ 默认 | ★★☆ | Pollinations FLUX,免费无key,约60s/张;右下角水印(脚本已裁),573x1027低分辨率 |
+| `baidu` | 备选 | ★★ | 百度 Stable-Diffusion-XL,最快;假印章/糊细节多 |
+
+- `wan` 实测质量最好(机检 PASS),但账户欠费报 `Arrearage`,充值后可用:`--engine wan`
+- `flux` 免费额度每 IP 45s 一张(402 FREE_LIMIT),偶发 503;脚本 8 次退避重试,失败自动切 baidu
+- `flux` 免费额度会在右下角打 `pollinations.ai` 水印 → 脚本自动裁掉底部 7%
+- `baidu`:中文 prompt → 400 必须英文;尺寸只认 768x1024/1024x768/1024x1024;`ERNIE-Image-Turbo` 已下线(404)
+- 一集6张:flux 约 7-10 分钟,baidu 约 2 分钟
+- **免费源出片不稳定(实测 flux 6张约 3张 PASS)**,重要片子建议用 wan
 
 ### 生图风格
 

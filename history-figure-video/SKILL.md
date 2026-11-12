@@ -170,12 +170,18 @@ python3 ~/.openclaw/skills/history-figure-video/scripts/generate_images.py <epis
 
 **⚠️ 文生图必须串行调用，禁止并发。每次只调一张图，等上一张完成后再调下一张。多集制作时也必须逐集串行，禁止同时为多集生图。**
 
-脚本读取script.json的bg_prompt，调用百度AI Studio API(**Stable-Diffusion-XL**)生成图片，中心裁切为 768x1376，失败时PIL渐变兜底。输出 `images/ai_{NN}.png`。脚本内置 8s 节流 + 退避重试，禁止并发。
+**三引擎**:`wan`(阿里万相2.5,画质最好,~¥0.2/张,**当前欠费不可用**)、`flux`(默认,Pollinations FLUX 免费,有低分辨率+偶发503,水印脚本已裁)、`baidu`(百度 SD-XL,最快但假印章/糊细节多)。出图统一后处理为 768x1376 (9:16),失败时 PIL 渐变兜底。
 
-**⚠️ bg_prompt 必须写英文** — 接口吃中文 prompt 直接 400(实测)。格式:`traditional chinese painting, [scene], muted natural colors, soft diffused light, fine brushwork, vertical composition, no text, no characters`。
-- 尺寸只认 768x1024/1024x768/1024x1024,其它 400
-- `ERNIE-Image-Turbo` 已下线(404),别再改回
+```bash
+# 默认 flux(约60s/张,一集6张约7-10分钟)
+python3 ~/.openclaw/skills/history-figure-video/scripts/generate_images.py <episode_dir>
+# 快速版/兜底
+python3 ~/.openclaw/skills/history-figure-video/scripts/generate_images.py <episode_dir> --engine baidu
+```
+
+**⚠️ bg_prompt 必须写英文**(百度接口吃中文直接 400;flux 也建议英文)。格式:`traditional chinese painting, [scene], muted natural colors, soft diffused light, fine brushwork, vertical composition, no text, no characters`。负面词脚本已内置(`text, watermark, signature, seal...`)。
 - 补图:`--force` 全部重跑,`--only N` 只重生第 N 张
+- 禁止并发(脚本有文件锁)
 
 **⚠️ TTS_API_KEY仅用于TTS(步骤6)，严禁用于文生图。DashScope的wanx-v1、image-synthesis、multimodal-generation等文生图API一律禁止调用。**
 
@@ -183,13 +189,19 @@ python3 ~/.openclaw/skills/history-figure-video/scripts/generate_images.py <epis
 
 ## 4b 逐张图片质检
 
-逐张审查,每张汇报。
+**用脚本机检,不要只靠肉眼**:
 
-**审查标准**:构图合理、画面完整、无文字渲染、风格统一、人物剪影/侧脸。
+```bash
+python3 ~/.openclaw/skills/history-figure-video/scripts/image_qa.py <episode_dir>/images/ai_*.png
+```
+
+`image_qa.py` 用视觉模型逐张判 PASS/FAIL,检查:①真汉字/水印/假印章签名 ②畸形手指多头 ③廉价AI感/现代物品穿帮 ④过暗过曝。退出码 0=全过。
+
+**审查标准**:构图合理、画面完整、无文字渲染(含假签名/假印章)、风格统一、人物结构正常。
 
 ### 审查流程
 
-1. 按序审查 `images/ai_{NN}.png`
+1. 跑 `image_qa.py`,按输出的 PASS/FAIL 逐张处理
 2. **PASS** → 记录通过,继续下一张
 3. **FAIL** → 执行重试流程
 
@@ -385,7 +397,8 @@ xvfb-run python sau_cli.py douyin upload-video ...
 | `references/data-format.md` | 数据路径、目录结构、series_info.json、progress.json格式 |
 | `references/polyphone-replace.md` | 多音字替换策略+检查脚本 |
 | `references/figure-candidates.md` | 历史人物候选列表 |
-| `scripts/generate_images.py` | AI生图脚本(百度Stable-Diffusion-XL,英文prompt,裁切768x1376,含节流重试) |
+| `scripts/generate_images.py` | AI生图脚本(默认flux,备选baidu;英文prompt,768x1376,节流+重试) |
+| `scripts/image_qa.py` | 图片质检(视觉模型机检文字/畸形/画风/明暗,退出码0=全过) |
 | `scripts/tts_subtitle.py` | TTS+字幕生成脚本(轻量入口,默认edge-tts,可切qwen) |
 | `scripts/tts_common.py` | TTS公共模块(edge-tts/qwen双引擎,音色指纹缓存) |
 | `scripts/compose_video.py` | 视频合成脚本(读取步骤6音频+SRT,含音效叠加,步骤7一体化) |
