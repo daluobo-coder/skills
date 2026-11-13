@@ -20,10 +20,10 @@ E01_DIR = None  # set by args
 parser = argparse.ArgumentParser(description='历史人物视频合成')
 parser.add_argument('episode_dir', help='集目录路径')
 parser.add_argument('--voice', default='Vincent', help='百炼TTS音色 (默认: Vincent)')
-parser.add_argument('--font-size', type=int, default=14, help='字幕字号 (默认: 14)')
+parser.add_argument('--font-size', type=int, default=18, help='字幕字号 (默认: 14)')
 parser.add_argument('--bgm', default='~/workspace/data/ai_drama/bgm/gaoshan_liushui_guzheng.mp3', help='BGM路径')
-parser.add_argument('--fps', type=int, default=5, help='视频帧率 (默认: 5)')
-parser.add_argument('--crf', type=int, default=30, help='视频CRF (默认: 30)')
+parser.add_argument('--fps', type=int, default=30, help='视频帧率 (默认: 5)')
+parser.add_argument('--crf', type=int, default=23, help='视频CRF (默认: 30)')
 parser.add_argument('--sfx-dir', default='~/workspace/data/ai_drama/sfx', help='音效素材目录')
 args = parser.parse_args()
 
@@ -32,6 +32,7 @@ FONT_SIZE = args.font_size
 BGM_PATH = os.path.expanduser(args.bgm)
 FPS = args.fps
 CRF = args.crf
+WIDTH, HEIGHT = 768, 1376
 SFX_DIR = os.path.expanduser(args.sfx_dir)
 
 AUDIO_DIR = os.path.join(E01_DIR, "audio")
@@ -118,6 +119,20 @@ def get_sfx_for_section_type(section_type):
     return sfx_map.get(section_type, None)
 
 
+
+def kenburns_vf(idx, dur, zoom=0.07):
+    """静态图做缓推/缓拉(Ken Burns)，避免整片像幻灯片"""
+    n = max(int(dur * FPS), 2)
+    step = zoom / n
+    if idx % 2 == 0:
+        z = f"min(1.0+{step:.6f}*on,{1.0+zoom:.3f})"
+    else:
+        z = f"max({1.0+zoom:.3f}-{step:.6f}*on,1.0)"
+    return (f"scale={WIDTH*2}:{HEIGHT*2}:flags=lanczos,"
+            f"zoompan=z='{z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+            f":d=1:s={WIDTH}x{HEIGHT}:fps={FPS}")
+
+
 # === Step 1: 预缩放帧图 ===
 print("=== Step 1: 预缩放帧图 ===")
 for i in range(len(sections)):
@@ -146,6 +161,7 @@ for i in range(len(sections)):
         continue
 
     dur = get_duration(audio)
+    vf = kenburns_vf(i, dur)
     print(f"  合成 seg_{i} ({dur:.1f}s)...")
 
     # 检查是否需要叠加音效
@@ -157,28 +173,30 @@ for i in range(len(sections)):
         # 叠加音效: 音效比旁白低6dB, 延迟0.3秒
         subprocess.run([
             "ffmpeg", "-y",
-            "-framerate", "1", "-loop", "1", "-i", frame,
+            "-framerate", str(FPS), "-loop", "1", "-i", frame,
             "-i", audio,
             "-i", sfx_path,
             "-filter_complex",
             f"[1:a]aresample=24000[main];[2:a]aresample=24000,volume=0.5,adelay=300|300[sfx];[main][sfx]amix=inputs=2:duration=first:dropout_transition=2,atrim=0:{dur}[aout]",
             "-map", "0:v", "-map", "[aout]",
-            "-c:v", "libx264", "-preset", "ultrafast", "-tune", "stillimage",
+            "-vf", vf,
+            "-c:v", "libx264", "-preset", "veryfast",
             "-crf", str(CRF),
             "-c:a", "aac", "-b:a", "128k",
-            "-pix_fmt", "yuv420p", "-r", str(FPS), "-vsync", "cfr",
+            "-pix_fmt", "yuv420p", "-vsync", "cfr",
             "-t", str(dur), out
         ], capture_output=True, timeout=300)
     else:
         # 无音效,直接合成
         subprocess.run([
             "ffmpeg", "-y",
-            "-framerate", "1", "-loop", "1", "-i", frame,
+            "-framerate", str(FPS), "-loop", "1", "-i", frame,
             "-i", audio,
-            "-c:v", "libx264", "-preset", "ultrafast", "-tune", "stillimage",
+            "-vf", vf,
+            "-c:v", "libx264", "-preset", "veryfast",
             "-crf", str(CRF),
             "-c:a", "aac", "-b:a", "128k",
-            "-pix_fmt", "yuv420p", "-r", str(FPS), "-vsync", "cfr",
+            "-pix_fmt", "yuv420p", "-vsync", "cfr",
             "-t", str(dur), out
         ], capture_output=True, timeout=300)
 
@@ -195,7 +213,7 @@ with open(concat_path, "w") as f:
         f.write(f"file '{sv}'\n")
 
 concat_raw = os.path.join(E01_DIR, "final_raw.mp4")
-subprocess.run(["ffmpeg","-y","-f","concat","-safe","0","-i",concat_path,"-c:v","libx264","-preset","ultrafast","-crf",str(CRF),"-c:a","aac","-b:a","128k","-pix_fmt","yuv420p","-r",str(FPS),concat_raw], capture_output=True, timeout=600)
+subprocess.run(["ffmpeg","-y","-f","concat","-safe","0","-i",concat_path,"-c:v","libx264","-preset","veryfast","-crf",str(CRF),"-c:a","aac","-b:a","128k","-pix_fmt","yuv420p","-r",str(FPS),concat_raw], capture_output=True, timeout=600)
 total_dur = get_duration(concat_raw)
 print(f"  拼接: {total_dur:.2f}s")
 
@@ -205,8 +223,8 @@ print("\n=== Step 4: 烧录字幕 ===")
 final_sub = os.path.join(E01_DIR, "final_sub.mp4")
 subprocess.run([
     "ffmpeg", "-y", "-i", concat_raw,
-    "-vf", f"subtitles='{merged_srt}':force_style='FontName=Noto Sans CJK SC,FontSize={FONT_SIZE},PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=1,Shadow=1,Shadow=1,Bold=1,Alignment=2,MarginV=60'",
-    "-c:v", "libx264", "-preset", "ultrafast", "-tune", "stillimage",
+    "-vf", f"subtitles='{merged_srt}':force_style='FontName=Noto Sans CJK SC,FontSize={FONT_SIZE},PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=1,Bold=1,Alignment=2,MarginV=28'",
+    "-c:v", "libx264", "-preset", "veryfast",
     "-crf", str(CRF),
     "-c:a", "copy", "-r", str(FPS), final_sub
 ], capture_output=True, timeout=600)

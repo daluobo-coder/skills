@@ -253,6 +253,8 @@ echo 0 | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo  # 0=启用睿�
 
 compose_video.py 读取步骤6已生成的音频和SRT,完成:预缩放帧图→合成节视频(含音效叠加)→拼接→字幕烧录→BGM混合→复制到media目录→更新progress.json。
 
+**默认参数(2026-11 调优)**:`--fps 30 --crf 23 --font-size 18`。静态图每节做 7% 缓推/缓拉(Ken Burns,奇偶段方向相反),避免整片像幻灯片;字幕字号18(实测约61px高)、MarginV=28 贴底,描边2。旧默认 5fps/CRF30/字号14 实测字幕过小、画面发虚、观感像PPT。
+
 ```bash
 python3 ~/.openclaw/skills/history-figure-video/scripts/compose_video.py <episode_dir>
 ```
